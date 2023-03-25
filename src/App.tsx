@@ -163,5 +163,4 @@ const App: React.FC = () => {
 
 export default App;
 
-//https://www.youtube.com/watch?v=FJDVKeh7RJI&ab_channel=freeCodeCamp.org
-//Following this one here. 37:55
+//https://singular-bonbon-3b21bc.netlify.app
