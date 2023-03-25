@@ -3,8 +3,12 @@ import "./App.css";
 import InputField from "./components/InputField";
 import { todo } from "./components/model";
 import TodoList from "./components/TodoList";
+import { DragDropContext, DropResult } from "react-beautiful-dnd";
 
-export type todoState = todo[];
+export type todoState = {
+  todos: todo[];
+  completedTodos: todo[];
+};
 
 export enum todoActionType {
   add = "add",
@@ -12,6 +16,8 @@ export enum todoActionType {
   edit = "edit",
   done = "done",
   default = "default",
+  complete = "complete",
+  todos = "todos",
 }
 
 export type Actions =
@@ -34,28 +40,58 @@ export type Actions =
   | {
       type: todoActionType.default;
       payload?: todo;
+    }
+  | {
+      type: todoActionType.complete;
+      payload: todo[];
+    }
+  | {
+      type: todoActionType.todos;
+      payload: todo[];
     };
 
-const reducer = (state: todoState, action: Actions) => {
+export const reducer = (state: todoState, action: Actions) => {
   switch (action.type) {
     case todoActionType.add:
-      return [
+      return {
         ...state,
-        { id: Date.now(), todoText: action.payload, isDone: false },
-      ];
+        todos: [
+          ...state.todos,
+          { id: Date.now(), todoText: action.payload, isDone: false },
+        ],
+      };
 
     case todoActionType.remove:
-      return state.filter((todo: todo) => todo.id !== action.payload);
+      return {
+        ...state,
+        todos: state.todos.filter((todo: todo) => todo.id !== action.payload),
+      };
     case todoActionType.edit:
-      return state.map((todo: todo) =>
-        todo.id === action.payload.id
-          ? { ...todo, todoText: action.payload.todoText }
-          : todo
-      );
+      return {
+        ...state,
+        todos: state.todos.map((todo: todo) =>
+          todo.id === action.payload.id
+            ? { ...todo, todoText: action.payload.todoText }
+            : todo
+        ),
+      };
     case todoActionType.done:
-      return state.map((todo: todo) =>
-        todo.id === action.payload ? { ...todo, isDone: !todo.isDone } : todo
-      );
+      return {
+        ...state,
+        todos: state.todos.map((todo: todo) =>
+          todo.id === action.payload ? { ...todo, isDone: !todo.isDone } : todo
+        ),
+      };
+    case todoActionType.complete:
+      return {
+        ...state,
+        completedTodos: action.payload,
+      };
+    case todoActionType.todos:
+      return {
+        ...state,
+        todos: action.payload,
+      };
     case todoActionType.default:
       return state;
   }
@@ -63,8 +99,10 @@ const reducer = (state: todoState, action: Actions) => {
 
 const App: React.FC = () => {
   const [todoText, setTodoText] = useState<string>("");
-  // const [todos, setTodos] = useState<todo[]>([]);
-  const [state, dispatch] = useReducer(reducer, []);
+  const [state, dispatch] = useReducer(reducer, {
+    todos: [],
+    completedTodos: [],
+  });
 
   const handleAdd = (e: React.FormEvent): void => {
     e.preventDefault();
@@ -76,16 +114,50 @@ const App: React.FC = () => {
     }
   };
 
+  const onDragEnd = (result: DropResult) => {
+    const { destination, source } = result;
+    console.log(destination, source);
+    if (!destination) return;
+    if (
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
+    )
+      return;
+
+    let add,
+      active = state.todos,
+      complete = state.completedTodos;
+
+    if (source.droppableId === "todosList") {
+      add = active[source.index];
+      active.splice(source.index, 1);
+    } else {
+      add = complete[source.index];
+      complete.splice(source.index, 1);
+    }
+
+    if (destination.droppableId === "todosList") {
+      active.splice(destination.index, 0, add);
+    } else {
+      complete.splice(destination.index, 0, add);
+    }
+
+    dispatch({ type: todoActionType.complete, payload: complete });
+    dispatch({ type: todoActionType.todos, payload: active });
+  };
+
   return (
-    <div className="App">
-      <span className="heading">Taskiffy</span>
-      <InputField
-        todoText={todoText}
-        setTodoText={setTodoText}
-        handleAdd={handleAdd}
-      />
-      <TodoList todos={state} dispatch={dispatch} />
-    </div>
+    <DragDropContext onDragEnd={onDragEnd}>
+      <div className="App">
+        <span className="heading">Taskiffy</span>
+        <InputField
+          todoText={todoText}
+          setTodoText={setTodoText}
+          handleAdd={handleAdd}
+        />
+        <TodoList state={state} dispatch={dispatch} />
+      </div>
+    </DragDropContext>
   );
 };
 
